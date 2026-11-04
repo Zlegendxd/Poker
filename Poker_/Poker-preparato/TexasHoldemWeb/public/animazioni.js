@@ -1,7 +1,6 @@
 function creaCarta(carta, coperta = false, indice = 0) {
   let elemento = document.createElement('span');
-  elemento.className = 'playing-card' + (coperta ? ' back' : '') + (!coperta && (carta.s === '♥' || carta.s === '♦') ? ' red' : ' black') + ' deal';
-  elemento.style.animationDelay = (indice * 0.07) + 's';
+  elemento.className = 'playing-card' + (coperta ? ' back' : '') + (!coperta && carta && (carta.s === '♥' || carta.s === '♦') ? ' red' : ' black');
   if (!coperta && carta) {
     let valore = document.createElement('span');
     valore.className = 'card-value';

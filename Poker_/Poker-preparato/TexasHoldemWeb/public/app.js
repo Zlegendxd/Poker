@@ -220,7 +220,7 @@ function disegnaPartita() {
   let testoRuolo = document.getElementById('role');
 
   if (partita.spectator) {
-    testoRuolo.textContent = '👻 Modalità fantasma: puoi guardare, ma non puoi fare mosse e non vedi le carte private.';
+    testoRuolo.textContent = '👻 Modalità spectator: puoi guardare, ma non puoi fare mosse e non vedi le carte private.';
   } else {
     testoRuolo.textContent = 'Stai giocando come ' + partita.you + '. Condividi questo codice con gli amici: ' + partita.id;
   }
@@ -265,7 +265,7 @@ function disegnaPartita() {
   if (partita.spectator) {
     let messaggioFantasma = document.createElement('div');
     messaggioFantasma.className = 'ghost-private';
-    messaggioFantasma.innerHTML = '<span>👻</span><strong>Vista fantasma</strong><small>Le carte private non sono visibili agli spettatori.</small>';
+    messaggioFantasma.innerHTML = '<span>👻</span><strong>Vista spectator</strong><small>Le carte private non sono visibili agli spettatori.</small>';
     mieCarte.appendChild(messaggioFantasma);
   } else if (mioGiocatore && mioGiocatore.hole && mioGiocatore.hole.length > 0) {
     disegnaCarte(mieCarte, mioGiocatore.hole);
