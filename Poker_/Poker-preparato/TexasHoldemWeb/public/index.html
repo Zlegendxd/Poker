@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Texas Hold'em</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/animazioni.css">
+</head>
+<body>
+<header class="topbar"><div class="logo">♠ <span>POKER</span> <b>ROOM</b></div><div class="top-note">TEXAS HOLD'EM · TAVOLO VIRTUALE</div></header>
+<main>
+<section id="lobby" class="lobby panel">
+<div class="intro"><div class="eyebrow">IL TUO TAVOLO TI ASPETTA</div><h1>Texas <span>Hold'em</span></h1><p>Una partita tra amici, fino a 10 giocatori. Oppure entra come fantasma e guarda la mano.</p></div>
+<div class="lobby-grid">
+<form id="createForm" class="form-card"><div class="form-icon">＋</div><h2>Crea un tavolo</h2><label>Il tuo nickname<input id="createName" placeholder="Es. Poker1" required maxlength="18"></label><div class="input-row"><label>Small blind<input id="smallBlind" type="number" value="10" min="1" required></label><label>Big blind<input id="bigBlind" type="number" value="20" min="2" required></label></div><button class="main-button">Crea partita <span>→</span></button></form>
+<form id="joinForm" class="form-card"><div class="form-icon">♣</div><h2>Entra al tavolo</h2><label>Codice partita<input id="joinCode" placeholder="Codice del tavolo" required maxlength="6"></label><label>Il tuo nickname<input id="joinName" placeholder="Es. Poker2" required maxlength="18"></label><button class="main-button">Gioca <span>→</span></button></form>
+<form id="watchForm" class="form-card ghost-form"><div class="form-icon ghost-icon">👻</div><h2>Modalità fantasma</h2><p class="small-text">Guarda la partita senza giocare. Le carte private restano nascoste.</p><label>Codice partita<input id="watchCode" placeholder="Codice del tavolo" required maxlength="6"></label><label>Il tuo nickname<input id="watchName" placeholder="Es. Spettatore" required maxlength="18"></label><button class="ghost-button">Entra come fantasma <span>◉</span></button></form>
+</div><div id="error" class="error-box"></div><div class="feature-strip"><span>♠ 2–10 giocatori</span><span>♦ Fiches virtuali</span><span>♣ Carte private protette</span><span>♥ Spettatori inclusi</span></div>
+</section>
+<section id="game" hidden>
+<div class="game-heading"><div><div class="eyebrow">TAVOLO IN CORSO</div><h1>Partita <span id="room"></span></h1><p id="role"></p></div><button id="leave" class="outline-button">← Esci dal tavolo</button></div>
+<div class="table-wrap"><div class="table-rim"><div class="poker-table"><div class="table-brand">TEXAS HOLD'EM <span>♠</span></div><div class="table-info"><div class="info-pill"><small>FASE</small><strong id="phase"></strong></div><div class="info-pill"><small>MANO</small><strong id="handNo"></strong></div><div class="info-pill"><small>PIATTO</small><strong><span id="pot"></span> <i>●</i></strong></div></div><div id="players" class="player-seats"></div><div class="center-table"><div class="pot-display"><span class="pot-chip">●</span><span>PIATTO</span><strong id="centerPot">0</strong></div><div id="board" class="community-cards"><div class="card-placeholder">?</div><div class="card-placeholder">?</div><div class="card-placeholder">?</div><div class="card-placeholder">?</div><div class="card-placeholder">?</div></div><div id="message" class="table-message">In attesa di iniziare la partita...</div></div><div class="turn-banner">TURNO DI <strong id="turn"></strong></div></div></div></div>
+<div class="bottom-grid"><section class="hand-panel"><div class="panel-heading"><div><div class="eyebrow">LA TUA MANO</div><h2>Le tue carte</h2></div><span class="lock-label">🔒 PRIVATE</span></div><div id="myCards" class="my-cards">Le tue carte appariranno qui</div></section>
+<section id="actions" class="actions-panel"><div class="panel-heading"><div><div class="eyebrow">LE TUE MOSSE</div><h2>Che vuoi fare?</h2></div></div><div class="action-buttons"><button id="fold" class="action-button fold-button">Fold</button><button id="checkCall" class="action-button check-button">Check / Call</button><button id="allin" class="action-button allin-button">All-in</button></div><div class="bet-row"><label>Puntata / rilancio<input id="amount" type="number" min="20" value="40"></label><button id="betRaise" class="main-button">Bet / Raise ↗</button></div><button id="start" class="main-button start-button">Inizia / nuova mano</button></section></div>
+<div class="status-row"><p id="status"></p><p id="apiWarning"></p></div>
+</section>
+</main>
+<footer>PROGETTO SCOLASTICO · FICHES VIRTUALI · GIOCA CON FAIR PLAY</footer>
+<script src="/animazioni.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
