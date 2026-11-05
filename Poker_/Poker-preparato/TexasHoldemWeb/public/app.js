@@ -1,32 +1,32 @@
-
 /* =========================================
    CLASSE GIOCATORE
 ========================================= */
 
 class Giocatore {
   constructor(dati) {
-    this.name = dati.name;
-    this.chips = dati.chips;
-    this.folded = dati.folded;
-    this.allIn = dati.allIn;
-    this.inHand = dati.inHand;
-    this.roundBet = dati.roundBet;
-    this.lastAction = dati.lastAction;
-    this.handName = dati.handName;
-    this.isYou = dati.isYou;
-    this.hole = dati.hole || [];
+    this.nome = dati.name;
+    this.fiches = dati.chips;
+    this.haPassato = dati.folded;
+    this.tuttoDentro = dati.allIn;
+    this.inGioco = dati.inHand;
+    this.puntataTurno = dati.roundBet;
+    this.ultimaAzione = dati.lastAction;
+    this.nomeMano = dati.handName;
+    this.seiTu = dati.isYou;
+    this.cartePrivate = dati.hole || [];
   }
 
   stato() {
-    if (this.folded) return 'Fold';
-    if (this.allIn) return 'All-in';
-    if (this.lastAction) return this.lastAction;
-    if (this.inHand) return 'In gioco';
+    if (this.haPassato) return 'Fold';
+    if (this.tuttoDentro) return 'All-in';
+    if (this.ultimaAzione) return this.ultimaAzione;
+    if (this.inGioco) return 'In gioco';
+
     return 'In attesa';
   }
 
   puoGiocare() {
-    return this.inHand && !this.folded && !this.allIn;
+    return this.inGioco && !this.haPassato && !this.tuttoDentro;
   }
 }
 
@@ -37,19 +37,19 @@ class Giocatore {
 
 class Sessione {
   constructor(dati) {
-    this.roomId = dati.roomId;
+    this.codiceStanza = dati.roomId;
     this.token = dati.token;
-    this.player = dati.player;
-    this.spectator = Boolean(dati.spectator);
+    this.giocatore = dati.player;
+    this.spettatore = Boolean(dati.spectator);
   }
 
-  isSpectator() {
-    return this.spectator;
+  eSpettatore() {
+    return this.spettatore;
   }
 
   datiRichiesta() {
     return {
-      roomId: this.roomId,
+      roomId: this.codiceStanza,
       token: this.token
     };
   }
@@ -63,49 +63,56 @@ class Sessione {
 class Partita {
   constructor(dati) {
     this.id = dati.id;
-    this.apiGameId = dati.apiGameId;
-    this.host = dati.host;
-    this.phase = dati.phase;
-    this.handNo = dati.handNo;
-    this.board = dati.board || [];
-    this.pot = dati.pot;
-    this.currentBet = dati.currentBet;
-    this.minRaise = dati.minRaise;
-    this.smallBlind = dati.smallBlind;
-    this.bigBlind = dati.bigBlind;
-    this.dealer = dati.dealer;
-    this.acting = dati.acting;
-    this.pending = dati.pending || [];
-    this.message = dati.message;
-    this.you = dati.you;
-    this.spectator = Boolean(dati.spectator);
-    this.canStart = dati.canStart;
-    this.apiWarning = dati.apiWarning || '';
+    this.idPartitaApi = dati.apiGameId;
+    this.ospite = dati.host;
+    this.fase = dati.phase;
+    this.numeroMano = dati.handNo;
+    this.tavolo = dati.board || [];
+    this.piatto = dati.pot;
+    this.puntataCorrente = dati.currentBet;
+    this.rilancioMinimo = dati.minRaise;
+    this.piccoloBuio = dati.smallBlind;
+    this.grandeBuio = dati.bigBlind;
+    this.mazziere = dati.dealer;
+    this.giocatoreDiTurno = dati.acting;
+    this.giocatoriInAttesa = dati.pending || [];
+    this.messaggio = dati.message;
+    this.tuoNome = dati.you;
+    this.spettatore = Boolean(dati.spectator);
+    this.puoIniziare = dati.canStart;
+    this.avvisoApi = dati.apiWarning || '';
 
-    this.players = (dati.players || []).map(
+    this.giocatori = (dati.players || []).map(
       giocatore => new Giocatore(giocatore)
     );
   }
 
   trovaMioGiocatore() {
-    return this.players.find(giocatore => giocatore.isYou) || null;
+    return this.giocatori.find(
+      giocatore => giocatore.seiTu
+    ) || null;
   }
 
   possoGiocare() {
     const mioGiocatore = this.trovaMioGiocatore();
 
-    if (this.spectator || !mioGiocatore) return false;
-    if (this.acting !== this.you) return false;
+    if (this.spettatore || !mioGiocatore) return false;
+    if (this.giocatoreDiTurno !== this.tuoNome) return false;
     if (!mioGiocatore.puoGiocare()) return false;
 
-    return ['preflop', 'flop', 'turn', 'river'].includes(this.phase);
+    return [
+      'preflop',
+      'flop',
+      'turn',
+      'river'
+    ].includes(this.fase);
   }
 
   devoChiamare() {
     const mioGiocatore = this.trovaMioGiocatore();
 
     return mioGiocatore &&
-      this.currentBet > mioGiocatore.roundBet;
+      this.puntataCorrente > mioGiocatore.puntataTurno;
   }
 }
 
@@ -148,14 +155,14 @@ class ServerAPI {
     return this.chiedi('/api/join', 'POST', dati);
   }
 
-  guarda(dati) {
+  osserva(dati) {
     return this.chiedi('/api/watch', 'POST', dati);
   }
 
   stato(sessione) {
     const indirizzo =
       '/api/state?roomId=' +
-      encodeURIComponent(sessione.roomId) +
+      encodeURIComponent(sessione.codiceStanza) +
       '&token=' +
       encodeURIComponent(sessione.token);
 
@@ -185,9 +192,9 @@ class InterfacciaGioco {
     this.partita = null;
     this.aggiornamentoAutomatico = null;
 
-    this.ultimeCarteComuni = '';
+    this.ultimeCarteTavolo = '';
     this.ultimoValorePiatto = -1;
-    this.ultimoTesto = '';
+    this.ultimoMessaggio = '';
 
     this.collegaEventi();
   }
@@ -196,7 +203,7 @@ class InterfacciaGioco {
     document.getElementById('error').textContent = testo;
   }
 
-  mostraStatus(testo) {
+  mostraStato(testo) {
     document.getElementById('status').textContent = testo;
   }
 
@@ -215,6 +222,7 @@ class InterfacciaGioco {
       };
 
       const risultato = await this.api.crea(dati);
+
       this.entraNellaPartita(risultato);
 
     } catch (errore) {
@@ -232,6 +240,7 @@ class InterfacciaGioco {
       };
 
       const risultato = await this.api.entra(dati);
+
       this.entraNellaPartita(risultato);
 
     } catch (errore) {
@@ -239,7 +248,7 @@ class InterfacciaGioco {
     }
   }
 
-  async entraComeFantasma(evento) {
+  async entraComeSpettatore(evento) {
     evento.preventDefault();
 
     try {
@@ -248,7 +257,8 @@ class InterfacciaGioco {
         name: document.getElementById('watchName').value
       };
 
-      const risultato = await this.api.guarda(dati);
+      const risultato = await this.api.osserva(dati);
+
       this.entraNellaPartita(risultato);
 
     } catch (errore) {
@@ -259,16 +269,16 @@ class InterfacciaGioco {
   entraNellaPartita(dati) {
     this.sessione = new Sessione(dati);
 
-    this.ultimeCarteComuni = '';
+    this.ultimeCarteTavolo = '';
     this.ultimoValorePiatto = -1;
-    this.ultimoTesto = '';
+    this.ultimoMessaggio = '';
 
     document.getElementById('lobby').hidden = true;
     document.getElementById('game').hidden = false;
 
     document.body.classList.toggle(
       'ghost-view',
-      this.sessione.isSpectator()
+      this.sessione.eSpettatore()
     );
 
     document.getElementById('room').textContent =
@@ -297,7 +307,7 @@ class InterfacciaGioco {
       this.disegnaPartita();
 
     } catch (errore) {
-      this.mostraStatus(errore.message);
+      this.mostraStato(errore.message);
     }
   }
 
@@ -307,17 +317,18 @@ class InterfacciaGioco {
     if (!carte || carte.length === 0) {
       contenitore.textContent =
         'Le carte appariranno quando inizia la mano';
+
       return;
     }
 
     for (let numero = 0; numero < carte.length; numero++) {
-      const cartaDisegnata = creaCarta(
+      const carta = creaCarta(
         carte[numero],
         false,
         numero
       );
 
-      contenitore.appendChild(cartaDisegnata);
+      contenitore.appendChild(carta);
     }
   }
 
@@ -341,21 +352,22 @@ class InterfacciaGioco {
       distanzaY = 37;
     }
 
-    const x = 50 + Math.cos(angolo) * distanzaX;
-    const y = 50 + Math.sin(angolo) * distanzaY;
+    const posizioneX = 50 + Math.cos(angolo) * distanzaX;
+    const posizioneY = 50 + Math.sin(angolo) * distanzaY;
 
     return {
-      left: x + '%',
-      top: y + '%',
+      left: posizioneX + '%',
+      top: posizioneY + '%',
       transform: 'translate(-50%,-50%)'
     };
   }
 
   disegnaGiocatori() {
     const contenitore = document.getElementById('players');
+
     contenitore.innerHTML = '';
 
-    const giocatori = this.partita.players;
+    const giocatori = this.partita.giocatori;
 
     for (let numero = 0; numero < giocatori.length; numero++) {
       const giocatore = giocatori[numero];
@@ -364,11 +376,11 @@ class InterfacciaGioco {
 
       posto.className = 'seat';
 
-      if (this.partita.acting === giocatore.name) {
+      if (this.partita.giocatoreDiTurno === giocatore.nome) {
         posto.classList.add('active');
       }
 
-      if (giocatore.name === this.partita.dealer) {
+      if (giocatore.nome === this.partita.mazziere) {
         posto.classList.add('dealer');
       }
 
@@ -381,19 +393,21 @@ class InterfacciaGioco {
       );
 
       const nome = document.createElement('div');
+
       nome.className = 'seat-name';
+      nome.textContent = giocatore.nome;
 
-      nome.textContent = giocatore.name;
-
-      if (giocatore.isYou) {
+      if (giocatore.seiTu) {
         nome.textContent += ' (tu)';
       }
 
       const fiches = document.createElement('div');
+
       fiches.className = 'seat-chips';
-      fiches.textContent = '● ' + giocatore.chips + ' fiches';
+      fiches.textContent = '● ' + giocatore.fiches + ' fiches';
 
       const azione = document.createElement('div');
+
       azione.className = 'seat-action';
       azione.textContent = giocatore.stato();
 
@@ -402,11 +416,12 @@ class InterfacciaGioco {
       posto.appendChild(azione);
 
       if (
-        giocatore.inHand &&
-        !giocatore.folded &&
-        !['waiting', 'finished'].includes(this.partita.phase)
+        giocatore.inGioco &&
+        !giocatore.haPassato &&
+        !['waiting', 'finished'].includes(this.partita.fase)
       ) {
         const carteCoperte = document.createElement('div');
+
         carteCoperte.className = 'mini-cards';
 
         carteCoperte.appendChild(creaCarta(null, true, 0));
@@ -426,58 +441,60 @@ class InterfacciaGioco {
 
     const testoRuolo = document.getElementById('role');
 
-    if (partita.spectator) {
+    if (partita.spettatore) {
       testoRuolo.textContent =
-        '👻 Modalità spectator: puoi guardare, ma non puoi fare mosse e non vedi le carte private.';
+        '👻 Modalità spettatore: puoi guardare, ma non puoi fare mosse e non vedi le carte private.';
     } else {
       testoRuolo.textContent =
-        'Stai giocando come ' + partita.you +
+        'Stai giocando come ' + partita.tuoNome +
         '. Condividi questo codice con gli amici: ' +
         partita.id;
     }
 
     testoRuolo.classList.toggle(
       'ghost-role',
-      partita.spectator
+      partita.spettatore
     );
 
     document.getElementById('phase').textContent =
-      partita.phase;
+      partita.fase;
 
     document.getElementById('handNo').textContent =
-      partita.handNo;
+      partita.numeroMano;
 
     document.getElementById('turn').textContent =
-      partita.acting || 'nessuno';
+      partita.giocatoreDiTurno || 'nessuno';
 
     document.getElementById('pot').textContent =
-      partita.pot;
+      partita.piatto;
 
     document.getElementById('centerPot').textContent =
-      partita.pot;
+      partita.piatto;
 
     document.getElementById('message').textContent =
-      partita.message;
+      partita.messaggio;
 
-    if (partita.pot !== this.ultimoValorePiatto) {
+    if (partita.piatto !== this.ultimoValorePiatto) {
       animaPiatto();
-      this.ultimoValorePiatto = partita.pot;
+
+      this.ultimoValorePiatto = partita.piatto;
     }
 
-    if (partita.message !== this.ultimoTesto) {
+    if (partita.messaggio !== this.ultimoMessaggio) {
       animaMessaggio();
-      this.ultimoTesto = partita.message;
+
+      this.ultimoMessaggio = partita.messaggio;
     }
 
-    const carteComuni = JSON.stringify(partita.board);
+    const carteTavolo = JSON.stringify(partita.tavolo);
 
-    if (carteComuni !== this.ultimeCarteComuni) {
+    if (carteTavolo !== this.ultimeCarteTavolo) {
       this.disegnaCarte(
         document.getElementById('board'),
-        partita.board
+        partita.tavolo
       );
 
-      this.ultimeCarteComuni = carteComuni;
+      this.ultimeCarteTavolo = carteTavolo;
     }
 
     this.disegnaGiocatori();
@@ -485,25 +502,26 @@ class InterfacciaGioco {
     const mioGiocatore = partita.trovaMioGiocatore();
 
     const mieCarte = document.getElementById('myCards');
+
     mieCarte.innerHTML = '';
 
-    if (partita.spectator) {
-      const messaggioFantasma = document.createElement('div');
+    if (partita.spettatore) {
+      const messaggioSpettatore = document.createElement('div');
 
-      messaggioFantasma.className = 'ghost-private';
+      messaggioSpettatore.className = 'ghost-private';
 
-      messaggioFantasma.innerHTML =
-        '<span>👻</span><strong>Vista spectator</strong>' +
+      messaggioSpettatore.innerHTML =
+        '<span>👻</span><strong>Vista spettatore</strong>' +
         '<small>Le carte private non sono visibili agli spettatori.</small>';
 
-      mieCarte.appendChild(messaggioFantasma);
+      mieCarte.appendChild(messaggioSpettatore);
 
     } else if (
       mioGiocatore &&
-      mioGiocatore.hole &&
-      mioGiocatore.hole.length > 0
+      mioGiocatore.cartePrivate &&
+      mioGiocatore.cartePrivate.length > 0
     ) {
-      this.disegnaCarte(mieCarte, mioGiocatore.hole);
+      this.disegnaCarte(mieCarte, mioGiocatore.cartePrivate);
 
     } else {
       mieCarte.textContent =
@@ -519,18 +537,18 @@ class InterfacciaGioco {
     document.getElementById('amount').disabled = !possoGiocare;
 
     document.getElementById('start').hidden =
-      !partita.canStart || partita.spectator;
+      !partita.puoIniziare || partita.spettatore;
 
     document.getElementById('status').textContent =
-      'Giocatori: ' + partita.players.length +
+      'Giocatori: ' + partita.giocatori.length +
       '/10. Codice da condividere: ' + partita.id;
 
     document.getElementById('apiWarning').textContent =
-      partita.apiWarning;
+      partita.avvisoApi;
   }
 
   async faiMossa(azione, importo = 0) {
-    if (!this.sessione || this.sessione.isSpectator()) {
+    if (!this.sessione || this.sessione.eSpettatore()) {
       return;
     }
 
@@ -546,7 +564,7 @@ class InterfacciaGioco {
       await this.aggiornaPartita();
 
     } catch (errore) {
-      this.mostraStatus(errore.message);
+      this.mostraStato(errore.message);
     }
   }
 
@@ -561,7 +579,7 @@ class InterfacciaGioco {
       await this.aggiornaPartita();
 
     } catch (errore) {
-      this.mostraStatus(errore.message);
+      this.mostraStato(errore.message);
     }
   }
 
@@ -582,13 +600,13 @@ class InterfacciaGioco {
 
   collegaEventi() {
     document.getElementById('createForm')
-      .addEventListener('submit', e => this.creaPartita(e));
+      .addEventListener('submit', evento => this.creaPartita(evento));
 
     document.getElementById('joinForm')
-      .addEventListener('submit', e => this.entraInPartita(e));
+      .addEventListener('submit', evento => this.entraInPartita(evento));
 
     document.getElementById('watchForm')
-      .addEventListener('submit', e => this.entraComeFantasma(e));
+      .addEventListener('submit', evento => this.entraComeSpettatore(evento));
 
     document.getElementById('fold')
       .addEventListener('click', () => {
@@ -613,7 +631,7 @@ class InterfacciaGioco {
         const importo =
           document.getElementById('amount').value;
 
-        const azione = this.partita.currentBet > 0
+        const azione = this.partita.puntataCorrente > 0
           ? 'raise'
           : 'bet';
 
