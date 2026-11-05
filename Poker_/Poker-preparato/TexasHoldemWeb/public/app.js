@@ -176,6 +176,10 @@ class ServerAPI {
   inizia(dati) {
     return this.chiedi('/api/start', 'POST', dati);
   }
+
+  listaPartite() {
+    return this.chiedi('/api/rooms', 'GET');
+  }
 }
 
 
@@ -195,8 +199,35 @@ class InterfacciaGioco {
     this.ultimeCarteTavolo = '';
     this.ultimoValorePiatto = -1;
     this.ultimoMessaggio = '';
+    this.ultimeMieCarte = '';
+    this.ultimiGiocatori = '';
 
     this.collegaEventi();
+
+    this.aggiornaElencoPartite();
+
+    this.aggiornamentoLobby = setInterval(() => {
+      if (!this.sessione) {
+        this.aggiornaElencoPartite();
+      }
+    }, 5000);
+
+    this.riprendiSessione();
+  }
+
+  async riprendiSessione() {
+    const salvata = localStorage.getItem('pokerSessione');
+    if (!salvata) return;
+
+    try {
+      const dati = JSON.parse(salvata);
+      const sessioneSalvata = new Sessione(dati);
+
+      await this.api.stato(sessioneSalvata);
+      this.entraNellaPartita(dati);
+    } catch (errore) {
+      localStorage.removeItem('pokerSessione');
+    }
   }
 
   mostraErrore(testo) {
@@ -205,6 +236,67 @@ class InterfacciaGioco {
 
   mostraStato(testo) {
     document.getElementById('status').textContent = testo;
+  }
+
+  async aggiornaElencoPartite() {
+    const elenco = document.getElementById('roomsList');
+    const conteggio = document.getElementById('roomsCount');
+
+    if (!elenco || !conteggio) return;
+
+    try {
+      const partite = await this.api.listaPartite();
+
+      elenco.innerHTML = '';
+      conteggio.textContent = partite.length;
+
+      if (partite.length === 0) {
+        elenco.textContent = 'Non ci sono partite disponibili al momento.';
+        return;
+      }
+
+      for (let numero = 0; numero < partite.length; numero++) {
+        const partita = partite[numero];
+
+        const riga = document.createElement('div');
+        riga.className = 'public-room';
+
+        const informazioni = document.createElement('div');
+        informazioni.className = 'public-room-info';
+
+        const nome = document.createElement('strong');
+        nome.textContent = 'Stanza ' + partita.id;
+
+        const dettagli = document.createElement('span');
+        dettagli.textContent =
+          'Creatore: ' + partita.host +
+          ' · Giocatori: ' + partita.players + '/' + partita.maxPlayers +
+          ' · Buio: ' + partita.blinds;
+
+        const entra = document.createElement('button');
+        entra.type = 'button';
+        entra.textContent = 'Entra';
+
+        entra.addEventListener('click', () => {
+          document.getElementById('joinCode').value = partita.id;
+          document.getElementById('joinName').focus();
+          document.getElementById('joinForm').scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
+        });
+
+        informazioni.appendChild(nome);
+        informazioni.appendChild(dettagli);
+        riga.appendChild(informazioni);
+        riga.appendChild(entra);
+        elenco.appendChild(riga);
+      }
+
+    } catch (errore) {
+      conteggio.textContent = '—';
+      elenco.textContent = 'Impossibile caricare le partite disponibili.';
+    }
   }
 
   async creaPartita(evento) {
@@ -224,6 +316,7 @@ class InterfacciaGioco {
       const risultato = await this.api.crea(dati);
 
       this.entraNellaPartita(risultato);
+      this.aggiornaElencoPartite();
 
     } catch (errore) {
       this.mostraErrore(errore.message);
@@ -268,6 +361,7 @@ class InterfacciaGioco {
 
   entraNellaPartita(dati) {
     this.sessione = new Sessione(dati);
+    localStorage.setItem('pokerSessione', JSON.stringify(dati));
 
     this.ultimeCarteTavolo = '';
     this.ultimoValorePiatto = -1;
@@ -541,7 +635,7 @@ class InterfacciaGioco {
 
     document.getElementById('status').textContent =
       'Giocatori: ' + partita.giocatori.length +
-      '/10. Codice da condividere: ' + partita.id;
+      '/7. Codice da condividere: ' + partita.id;
 
     document.getElementById('apiWarning').textContent =
       partita.avvisoApi;
@@ -584,6 +678,8 @@ class InterfacciaGioco {
   }
 
   esciDallaPartita() {
+    localStorage.removeItem('pokerSessione');
+
     if (this.aggiornamentoAutomatico) {
       clearInterval(this.aggiornamentoAutomatico);
     }
@@ -596,6 +692,8 @@ class InterfacciaGioco {
 
     document.getElementById('game').hidden = true;
     document.getElementById('lobby').hidden = false;
+
+    this.aggiornaElencoPartite();
   }
 
   collegaEventi() {

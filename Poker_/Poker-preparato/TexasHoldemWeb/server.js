@@ -19,6 +19,7 @@ const API_BASE = (process.env.GAME_API_BASE || 'https://classe5ID.altervista.org
 const API_USER = process.env.GAME_API_USER || '';
 const API_PASS = process.env.GAME_API_PASS || '';
 const rooms = new Map();
+const HOST_TIMEOUT = 15000;
 
 function send(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' });
@@ -39,6 +40,24 @@ function cleanName(v) {
 }
 function token() { return crypto.randomBytes(24).toString('hex'); }
 function playerFor(room, playerToken) { return room.players.find(p => p.token === playerToken); }
+
+function aggiornaHost(room) {
+  const adesso = Date.now();
+  const hostAttuale = room.players.find(p => p.name === room.host);
+
+  if (hostAttuale && adesso - (hostAttuale.lastSeen || 0) < HOST_TIMEOUT) {
+    return;
+  }
+
+  const giocatoriCollegati = room.players.filter(
+    p => adesso - (p.lastSeen || 0) < HOST_TIMEOUT
+  );
+
+  if (giocatoriCollegati.length > 0) {
+    room.host = giocatoriCollegati[0].name;
+    room.message = room.host + ' è il nuovo host della partita.';
+  }
+}
 function apiReady() { return Boolean(API_USER && API_PASS); }
 async function apiRequest(endpoint, method = 'GET') {
   if (!apiReady()) return { ok: false, error: 'Credenziali API non configurate nel file .env' };
@@ -272,7 +291,19 @@ async function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
     if (req.method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok:true, apiConfigured:apiReady() });
-    if (req.method === 'GET' && url.pathname === '/api/rooms') return send(res, 200, [...rooms.values()].filter(r => r.phase === 'waiting' && r.players.length < 10).map(r => ({ id:r.id, host:r.host, players:r.players.length, maxPlayers:10, blinds:`${r.smallBlind}/${r.bigBlind}` })));
+   if (req.method === 'GET' && url.pathname === '/api/rooms') {
+  return send(res, 200,
+    [...rooms.values()]
+      .filter(r => r.phase === 'waiting' && r.players.length < 7)
+      .map(r => ({
+        id: r.id,
+        host: r.host,
+        players: r.players.length,
+        maxPlayers: 7,
+        blinds: `${r.smallBlind}/${r.bigBlind}`
+      }))
+  );
+}
     if (req.method === 'POST' && url.pathname === '/api/create') {
       const body = await readBody(req); const name = cleanName(body.name);
       const existing = rooms.values(); for (const r of existing) if (r.players.some(p => p.name.toLowerCase() === name.toLowerCase())) throw new Error('Questo nome è già in uso in una partita attiva.');
@@ -281,20 +312,22 @@ async function route(req, res) {
       const external = await apiRequest(`/partita/${encodeURIComponent(name)}`, 'POST');
       const externalId = external.ok ? findId(external.data) : null;
       const roomId = crypto.randomBytes(3).toString('hex').toUpperCase(); const t = token();
-      const room = { id:roomId, spectators:[], apiGameId: externalId, apiWarning: externalId ? '' : (external.ok ? 'L’API ha risposto, ma non è stato trovato l’ID partita nella risposta. Controlla il JSON restituito dal professore.' : `API non collegata: ${external.error}. La partita locale funziona solo su questo server.`), host:name, players:[{name,token:t,chips:1000,hole:[],folded:false,allIn:false,inHand:false,roundBet:0,contribution:0,lastAction:'',handName:''}], phase:'waiting', handNo:0, dealer:-1, board:[], pot:0, currentBet:0, minRaise:bigBlind, smallBlind, bigBlind, acting:null, pending:[], message:'Partita creata. Condividi il codice con gli altri giocatori.' };
+      const room = { id:roomId, spectators:[], apiGameId: externalId, apiWarning: externalId ? '' : (external.ok ? 'L’API ha risposto, ma non è stato trovato l’ID partita nella risposta. Controlla il JSON restituito dal professore.' : `API non collegata: ${external.error}. La partita locale funziona solo su questo server.`), host:name, players:[{name,token:t,lastSeen:Date.now(),chips:1000,hole:[],folded:false,allIn:false,inHand:false,roundBet:0,contribution:0,lastAction:'',handName:''}], phase:'waiting', handNo:0, dealer:-1, board:[], pot:0, currentBet:0, minRaise:bigBlind, smallBlind, bigBlind, acting:null, pending:[], message:'Partita creata. Condividi il codice con gli altri giocatori.' };
       rooms.set(roomId, room);
       return send(res, 200, { roomId, token:t, player:name, apiGameId:room.apiGameId, apiWarning:room.apiWarning });
     }
     if (req.method === 'POST' && url.pathname === '/api/join') {
       const body = await readBody(req); const room = rooms.get(String(body.roomId || '').toUpperCase()); if (!room) throw new Error('Partita non trovata su questo server.');
       if (room.phase !== 'waiting') throw new Error('La mano è già iniziata. Aspetta la prossima partita.');
-      if (room.players.length >= 10) throw new Error('Il tavolo è pieno: massimo 10 giocatori.');
+      if (room.players.length >= 7) throw new Error('Il tavolo è pieno: massimo 7 giocatori.');
       const name = cleanName(body.name); if (room.players.some(p => p.name.toLowerCase() === name.toLowerCase())) throw new Error('Questo nome è già presente al tavolo.');
       for (const r of rooms.values()) if (r.id !== room.id && r.players.some(p => p.name.toLowerCase() === name.toLowerCase())) throw new Error('Questo nome è già in uso in un altro tavolo.');
-      let apiWarning = '';
-      if (room.apiGameId) { const jr = await apiRequest(`/join/${encodeURIComponent(room.apiGameId)}/${encodeURIComponent(name)}`, 'POST'); if (!jr.ok) apiWarning = `Giocatore aggiunto al tavolo del gioco, ma API join fallita: ${jr.error}`; }
-      const t = token(); room.players.push({name,token:t,chips:1000,hole:[],folded:false,allIn:false,inHand:false,roundBet:0,contribution:0,lastAction:'',handName:''}); room.message = `${name} si è unito al tavolo (${room.players.length}/10).`;
-      return send(res, 200, { roomId:room.id, token:t, player:name, apiWarning:apiWarning || room.apiWarning });
+      if (room.apiGameId) {
+  const jr = await apiRequest(`/join/${encodeURIComponent(room.apiGameId)}/${encodeURIComponent(name)}`, 'POST');
+  if (!jr.ok) throw new Error('API: impossibile aggiungere il giocatore. ' + jr.error);
+}
+      const t = token(); room.players.push({name,token:t,lastSeen:Date.now(),chips:1000,hole:[],folded:false,allIn:false,inHand:false,roundBet:0,contribution:0,lastAction:'',handName:''}); room.message = `${name} si è unito al tavolo (${room.players.length}/7).`;
+      return send(res, 200, { roomId:room.id, token:t, player:name, apiWarning: room.apiWarning || ''});
     }
     if (req.method === 'POST' && url.pathname === '/api/watch') {
       const body = await readBody(req); const room = rooms.get(String(body.roomId || '').toUpperCase()); if (!room) throw new Error('Partita non trovata.');
@@ -305,11 +338,18 @@ async function route(req, res) {
       const room = rooms.get(String(url.searchParams.get('roomId') || '').toUpperCase()); if (!room) throw new Error('Partita non trovata.');
       const t = url.searchParams.get('token'); const player = playerFor(room, t) || room.spectators.find(p => p.token === t);
       if (!player) throw new Error('Sessione non valida. Rientra con il codice della partita.');
+      if (!player.spectator) {
+        player.lastSeen = Date.now();
+        aggiornaHost(room);
+      }
       const state = view(room, player); state.apiWarning = room.apiWarning || ''; return send(res, 200, state);
     }
     if (req.method === 'POST' && url.pathname === '/api/start') {
       const body = await readBody(req); const room = rooms.get(String(body.roomId || '').toUpperCase()); if (!room) throw new Error('Partita non trovata.');
-      const player = playerFor(room, body.token); if (!player) throw new Error('Sessione non valida.'); if (player.name !== room.host) throw new Error('Solo chi ha creato il tavolo può iniziare la mano.');
+      const player = playerFor(room, body.token); if (!player) throw new Error('Sessione non valida.');
+      player.lastSeen = Date.now();
+      aggiornaHost(room);
+      if (player.name !== room.host) throw new Error('Solo l’host attuale può iniziare la mano.');
       startHand(room); return send(res, 200, { ok:true });
     }
     if (req.method === 'POST' && url.pathname === '/api/action') {
